@@ -1,6 +1,8 @@
-function [X, Y, u, v] = optical_flow_lk(window_size, img_t, img_tplus1, stride, method)
+function [X, Y, u, v] = optical_flow(window_size, img_t, img_tplus1, stride, method, alpha, max_iter)
     analytic = "analytic";
     matrix = "matrix";
+    hs = "hs";
+    
     [img_t_dx, img_t_dy] = gradient(img_t);
     [img_tplus1_dx, img_tplus1_dy] = gradient(img_tplus1);
 
@@ -36,27 +38,39 @@ function [X, Y, u, v] = optical_flow_lk(window_size, img_t, img_tplus1, stride, 
                     v_aux(i,j) = uv(2);
                 elseif method == analytic
                     win_dxdx = win_dx.*win_dx;
-                    sum_dxdx = sum(win_dxdx, 'all');
+                    sum_dxdx = sum(sum(win_dxdx));
                     
                     win_dydy = win_dy.*win_dy;
-                    sum_dydy = sum(win_dydy, 'all');
+                    sum_dydy = sum(sum(win_dydy));
                     
                     win_dxdt = win_dx.*win_dt;
-                    sum_dxdt = sum(win_dxdt, 'all');
+                    sum_dxdt = sum(sum(win_dxdt));
                     
                     win_dxdy = win_dx.*win_dy;
-                    sum_dxdy = sum(win_dxdy, 'all');
+                    sum_dxdy = sum(sum(win_dxdy));
                     
                     win_dydt = win_dy.*win_dt;
-                    sum_dydt = sum(win_dydt, 'all');
+                    sum_dydt = sum(sum(win_dydt));
                     
                     u_aux(i,j) = -(-sum_dydy * sum_dxdt + sum_dxdy * sum_dydt) / (sum_dxdx * sum_dydy - sum_dxdy * sum_dxdy);
                     v_aux(i,j) = -(sum_dxdy * sum_dxdt - sum_dxdx * sum_dydt) / (sum_dxdx * sum_dydy - sum_dxdy * sum_dxdy);
                 end
             end
         end
+    elseif method == hs
+        mask = ones(window_size(1));
+        mask = mask * 1/9;
+        for i = 1:max_iter
+            u_aux = conv2(u_aux, mask, 'same');
+            v_aux = conv2(v_aux, mask, 'same');
+
+            u_aux =  u_aux - ( dx .* ((dx .* u_aux) + (dy .* v_aux) + dt )) ./ ( alpha.^2 + dx.^2 + dy.^2);
+            v_aux =  v_aux - ( dy .* ((dx .* u_aux) + (dy .* v_aux) + dt )) ./ ( alpha.^2 + dx.^2 + dy.^2);
+        end
+        u_aux = -u_aux;
+        v_aux = -v_aux;
     else
-        disp("ERROR: Method no supported try 'matrix' or 'analityc'")
+        disp("ERROR: Method no supported try 'matrix' or 'analdtyc'")
     end
     [X,Y] = meshgrid(1:img_size(2), 1:img_size(1));
     X = stride2dmatrix(X, stride);
